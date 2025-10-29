@@ -242,6 +242,7 @@ def rgtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features, 
 def loda_rgtan_data(dataset: str, test_size: float):
     # prefix = "./antifraud/data/"
     prefix = "data/"
+    print("using dataset:", dataset)
     if dataset == 'S-FFSD':
         cat_features = ["Target", "Location", "Type"]
 

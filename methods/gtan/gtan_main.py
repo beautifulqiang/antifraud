@@ -17,6 +17,10 @@ from .gtan_model import GraphAttnModel
 from . import *
 
 
+# tensorboard作图
+from datetime import datetime
+from torch.utils.tensorboard import SummaryWriter
+
 def gtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features):
     device = args['device']
     graph = graph.to(device)
@@ -35,8 +39,22 @@ def gtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features):
     y = labels
     labels = torch.from_numpy(y.values).long().to(device)
     loss_fn = nn.CrossEntropyLoss().to(device)
+
+    # ========== TensorBoard 初始化 ==========
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_dir = "runs/gtan_experiment"
+    log_dir_with_time = os.path.join(log_dir, timestamp)
+    # 确保目录存在
+    os.makedirs(log_dir_with_time, exist_ok=True)
+    # 创建 TensorBoard writer
+    writer = SummaryWriter(log_dir=log_dir_with_time)
+    print(f"TensorBoard logs will be saved to: {log_dir_with_time}")
+
     for fold, (trn_idx, val_idx) in enumerate(kfold.split(feat_df.iloc[train_idx], y_target)):
         print(f'Training fold {fold + 1}')
+        # fold标记
+        fold_tag = f'Fold_{fold+1}'
+
         trn_ind, val_ind = torch.from_numpy(np.array(train_idx)[trn_idx]).long().to(
             device), torch.from_numpy(np.array(train_idx)[val_idx]).long().to(device)
 
@@ -114,6 +132,16 @@ def gtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features):
                     score = torch.softmax(train_batch_logits.clone().detach(), dim=1)[
                         :, 1].cpu().numpy()
 
+                    writer.add_scalar(f'{fold_tag}/Train/Loss', np.mean(train_loss_list),
+                                      epoch * len(train_dataloader) + step)
+                    writer.add_scalar(f'{fold_tag}/Train/AP',
+                                      average_precision_score(batch_labels.cpu().numpy(), score),
+                                      epoch * len(train_dataloader) + step)
+                    writer.add_scalar(f'{fold_tag}/Train/Acc', tr_batch_pred.detach(),
+                                      epoch * len(train_dataloader) + step)
+                    writer.add_scalar(f'{fold_tag}/Train/AUC', roc_auc_score(batch_labels.cpu().numpy(), score),
+                                      epoch * len(train_dataloader) + step)
+
                     # if (len(np.unique(score)) == 1):
                     #     print("all same prediction!")
                     try:
@@ -151,6 +179,7 @@ def gtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features):
                     # val_all_list += 1
                     val_batch_pred = torch.sum(torch.argmax(
                         val_batch_logits, dim=1) == batch_labels) / torch.tensor(batch_labels.shape[0])
+
                     val_acc_list = val_acc_list + val_batch_pred * \
                         torch.tensor(batch_labels.shape[0])
                     val_all_list = val_all_list + batch_labels.shape[0]
@@ -166,6 +195,13 @@ def gtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features):
                                                                               batch_labels.cpu().numpy(), score),
                                                                           val_batch_pred.detach(),
                                                                           roc_auc_score(batch_labels.cpu().numpy(), score)))
+                            writer.add_scalar(f'{fold_tag}/Val/Loss', val_loss_list / val_all_list, epoch)
+                            writer.add_scalar(f'{fold_tag}/Val/AP',
+                                              average_precision_score(batch_labels.cpu().numpy(), score),
+                                              epoch)
+                            writer.add_scalar(f'{fold_tag}/Val/Acc', val_batch_pred.detach(), epoch)
+                            writer.add_scalar(f'{fold_tag}/Val/AUC', roc_auc_score(batch_labels.cpu().numpy(), score),
+                                              epoch)
                         except:
                             pass
 
@@ -224,6 +260,12 @@ def gtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features):
     print("test f1:", f1_score(y_target, test_score1, average="macro"))
     print("test AP:", average_precision_score(y_target, test_score))
 
+    writer.add_scalar('Test/AUC', roc_auc_score(y_target, test_score))
+    writer.add_scalar('Test/F1', f1_score(y_target, test_score1, average="macro"))
+    writer.add_scalar('Test/AP', average_precision_score(y_target, test_score))
+
+    writer.close()
+
 
 def load_gtan_data(dataset: str, test_size: float):
     """
@@ -234,6 +276,7 @@ def load_gtan_data(dataset: str, test_size: float):
     """
     # prefix = './antifraud/data/'
     prefix = os.path.join(os.path.dirname(__file__), "..", "..", "data/")
+    print("using dataset:", dataset)
     if dataset == "S-FFSD":
         cat_features = ["Target", "Location", "Type"]
 

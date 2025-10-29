@@ -172,8 +172,7 @@ def span_data_2d(
         for time_span in time_windows:
             feature_of_one_timestamp = []
             prev_records = data.iloc[(row_idx - time_span):row_idx, :]
-            prev_and_now_records = data.iloc[(
-                                                     row_idx - time_span):row_idx + 1, :]
+            prev_and_now_records = data.iloc[(row_idx - time_span):row_idx + 1, :]
             prev_records = prev_records[prev_records['Source'] == acct_no]
 
             # AvgAmountT
@@ -248,8 +247,7 @@ def span_data_3d(
         for time_span in time_windows:
             feature_of_one_timestamp = []
             prev_records = data.iloc[(row_idx - time_span):row_idx, :]
-            prev_and_now_records = data.iloc[(
-                                                     row_idx - time_span):row_idx + 1, :]
+            prev_and_now_records = data.iloc[(row_idx - time_span):row_idx + 1, :]
             prev_records = prev_records[prev_records['Source'] == acct_no]
 
             for spatio_span in spatio_windows:

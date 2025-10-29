@@ -186,7 +186,7 @@ def feat_map():
 
 
 if __name__ == "__main__":
-
+    # 随机种子设置为42
     set_seed(42)
 
     # %%

@@ -10,4 +10,5 @@ test_size: 0.2
 epochs: 30
 batch_size: 512
 lr: 0.001
-device: cpu
+# 尝试使用gpu
+device: cuda:0

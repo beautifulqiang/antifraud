@@ -9,6 +9,11 @@ from methods.stan.stan import stan_model
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix, roc_auc_score, f1_score, average_precision_score
 
+# tensorboard作图
+import os
+from datetime import datetime
+from torch.utils.tensorboard import SummaryWriter
+
 
 def to_pred(logits: torch.Tensor) -> list:
     with torch.no_grad():
@@ -26,7 +31,8 @@ def att_train(
     batch_size: int = 256,
     attention_hidden_dim: int = 150,
     lr: float = 3e-3,
-    device: str = "cpu"
+    device: str = "cpu",
+    log_dir="runs/stan_experiment"
 ):
     model = stan_model(
         time_windows_dim=x_train.shape[1],
@@ -54,6 +60,19 @@ def att_train(
     loss_func = torch.nn.CrossEntropyLoss(weights)
 
     batch_num = ceil(len(labels) / batch_size)
+
+    # ========== TensorBoard 初始化 ==========
+    # 给 log_dir 加上时间戳子目录
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_dir_with_time = os.path.join(log_dir, timestamp)
+
+    # 确保目录存在
+    os.makedirs(log_dir_with_time, exist_ok=True)
+
+    # 创建 TensorBoard writer
+    writer = SummaryWriter(log_dir=log_dir_with_time)
+    print(f"TensorBoard logs will be saved to: {log_dir_with_time}")
+
     for epoch in range(epochs):
 
         loss = 0.
@@ -77,9 +96,23 @@ def att_train(
 
         true = labels.cpu().numpy()
         pred = np.array(pred)
-        print(
-            f"Epoch: {epoch}, loss: {(loss / batch_num):.4f}, auc: {roc_auc_score(true, pred):.4f}, F1: {f1_score(true, pred, average='macro'):.4f}, AP: {average_precision_score(true, pred):.4f}")
-        # print(confusion_matrix(true, pred))
+
+        # 计算指标
+        try:
+            auc = roc_auc_score(true, pred)
+        except ValueError:
+            auc = np.nan
+        f1 = f1_score(true, pred, average='macro')
+        ap = average_precision_score(true, pred)
+        avg_loss = loss / batch_num
+
+        print(f"Epoch: {epoch}, loss: {avg_loss:.4f}, auc: {auc:.4f}, F1: {f1:.4f}, AP: {ap:.4f}")
+
+        # 🔹 写入 TensorBoard
+        writer.add_scalar("Train/Loss", avg_loss, epoch)
+        writer.add_scalar("Train/AUC", auc, epoch)
+        writer.add_scalar("Train/F1", f1, epoch)
+        writer.add_scalar("Train/AP", ap, epoch)
 
     # feats_test = torch.from_numpy(
     #     x_test).to(dtype=torch.float32).to(device)
@@ -98,11 +131,23 @@ def att_train(
             output = model(feats_test[batch_mask])
             pred.extend(to_pred(output))
 
-        true = labels_test.cpu().numpy()
-        pred = np.array(pred)
-        print(
-            f"test set | auc: {roc_auc_score(true, pred):.4f}, F1: {f1_score(true, pred, average='macro'):.4f}, AP: {average_precision_score(true, pred):.4f}")
-        # print(confusion_matrix(true, pred))
+    true = labels_test.cpu().numpy()
+    try:
+        auc_test = roc_auc_score(true, pred)
+    except ValueError:
+        auc_test = np.nan
+    f1_test = f1_score(true, pred, average='macro')
+    ap_test = average_precision_score(true, pred)
+
+    print(f"Test | AUC: {auc_test:.4f} | F1: {f1_test:.4f} | AP: {ap_test:.4f}")
+
+    # 🔹 写入 TensorBoard（测试集）
+    writer.add_scalar("Test/AUC", auc_test, epoch)
+    writer.add_scalar("Test/F1", f1_test, epoch)
+    writer.add_scalar("Test/AP", ap_test, epoch)
+
+    # 关闭 TensorBoard writer
+    writer.close()
 
 
 def stan_main(
@@ -118,6 +163,10 @@ def stan_main(
     lr: float = 0.003,
     device="cpu",
 ):
+
+    print("torch.cuda.is_available():", torch.cuda.is_available())
+    print("current device: ", device)
+
     train_feature = torch.from_numpy(np.load(train_feature_dir, allow_pickle=True)).to(
         dtype=torch.float32).to(device)
     train_label = torch.from_numpy(np.load(train_label_dir, allow_pickle=True)).to(

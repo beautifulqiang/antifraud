@@ -12,6 +12,10 @@ from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.metrics import roc_auc_score, f1_score, average_precision_score
 from feature_engineering.data_engineering import span_data_2d
 
+# tensorboard作图
+from datetime import datetime
+from torch.utils.tensorboard import SummaryWriter
+
 
 def to_pred(logits: torch.Tensor) -> list:
     with torch.no_grad():
@@ -30,7 +34,8 @@ def stagn_train_2d(
     epochs: int = 18,
     attention_hidden_dim: int = 150,
     lr: float = 3e-3,
-    device: str = "cpu"
+    device: str = "cpu",
+    log_dir="runs/stagn_experiment"
 ):
     g = g.to(device)
     model = stagn_2d_model(
@@ -53,6 +58,18 @@ def stagn_train_2d(
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     loss_func = torch.nn.CrossEntropyLoss(weights)
 
+    # ========== TensorBoard 初始化 ==========
+    # 给 log_dir 加上时间戳子目录
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_dir_with_time = os.path.join(log_dir, timestamp)
+
+    # 确保目录存在
+    os.makedirs(log_dir_with_time, exist_ok=True)
+
+    # 创建 TensorBoard writer
+    writer = SummaryWriter(log_dir=log_dir_with_time)
+    print(f"TensorBoard logs will be saved to: {log_dir_with_time}")
+
     for epoch in range(epochs):
         optimizer.zero_grad()
 
@@ -64,15 +81,42 @@ def stagn_train_2d(
         pred = to_pred(out[train_idx])
         true = labels[train_idx].cpu().numpy()
         pred = np.array(pred)
-        print(f"Epoch: {epoch}, loss: {loss:.4f}, auc: {roc_auc_score(true, pred):.4f}, F1: {f1_score(true, pred, average='macro'):.4f}, AP: {average_precision_score(true, pred):.4f}")
+
+        # 计算指标
+        try:
+            auc = roc_auc_score(true, pred)
+        except ValueError:
+            auc = np.nan
+        f1 = f1_score(true, pred, average='macro')
+        ap = average_precision_score(true, pred)
+
+        print(f"Epoch: {epoch}, loss: {loss:.4f}, auc: {auc:.4f}, F1: {f1:.4f}, AP: {ap:.4f}")
+
+        # 🔹 写入 TensorBoard
+        writer.add_scalar("Train/Loss", loss, epoch)
+        writer.add_scalar("Train/AUC", auc, epoch)
+        writer.add_scalar("Train/F1", f1, epoch)
+        writer.add_scalar("Train/AP", ap, epoch)
 
     with torch.no_grad():
         out = model(features, g)
         pred = to_pred(out[test_idx])
         true = labels[test_idx].cpu().numpy()
         pred = np.array(pred)
-        print(
-            f"test set | auc: {roc_auc_score(true, pred):.4f}, F1: {f1_score(true, pred, average='macro'):.4f}, AP: {average_precision_score(true, pred):.4f}")
+
+    try:
+        auc_test = roc_auc_score(true, pred)
+    except ValueError:
+        auc_test = np.nan
+    f1_test = f1_score(true, pred, average='macro')
+    ap_test = average_precision_score(true, pred)
+
+    print(f"Test | AUC: {auc_test:.4f} | F1: {f1_test:.4f} | AP: {ap_test:.4f}")
+
+    # 🔹 写入 TensorBoard（测试集）
+    writer.add_scalar("Test/AUC", auc_test, epoch)
+    writer.add_scalar("Test/F1", f1_test, epoch)
+    writer.add_scalar("Test/AP", ap_test, epoch)
 
 
 def stagn_main(
@@ -86,6 +130,10 @@ def stagn_main(
     lr: float = 0.003,
     device="cpu",
 ):
+
+    print("torch.cuda.is_available():", torch.cuda.is_available())
+    print("current device: ", device)
+
     train_idx, test_idx = train_test_split(
         np.arange(features.shape[0]), test_size=test_ratio, stratify=labels)
 

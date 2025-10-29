@@ -17,7 +17,7 @@ class mcnn(nn.Module):
     ):
         super().__init__()
         self.conv1 = nn.Conv2d(
-            in_channels == in_channels,
+            in_channels = in_channels,
             out_channels=32,
             kernel_size=(2, 2)
         )
