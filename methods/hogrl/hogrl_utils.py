@@ -14,18 +14,18 @@ import os
 from sklearn.metrics import confusion_matrix
 
 filelist = {
-    'amz_upu': 'amz_upu_adjlists.pickle',
-    'amz_usu': 'amz_usu_adjlists.pickle',
-    'amz_uvu': 'amz_uvu_adjlists.pickle',
+    # 'amz_upu': 'amz_upu_adjlists.pickle',
+    # 'amz_usu': 'amz_usu_adjlists.pickle',
+    # 'amz_uvu': 'amz_uvu_adjlists.pickle',
     'yelp_rsr': 'yelp_rsr_adjlists.pickle',
     'yelp_rtr': 'yelp_rtr_adjlists.pickle',
     'yelp_rur': 'yelp_rur_adjlists.pickle'
 }
 
 file_matrix_prefix = {
-    'amz_upu': 'amazon_upu_matrix_',
-    'amz_usu': 'amazon_usu_matrix_',
-    'amz_uvu': 'amazon_uvu_matrix_',
+    # 'amz_upu': 'amazon_upu_matrix_',
+    # 'amz_usu': 'amazon_usu_matrix_',
+    # 'amz_uvu': 'amazon_uvu_matrix_',
     'yelp_rsr': 'yelpnet_rsr_matrix_decompision_',
     'yelp_rtr': 'yelpnet_rtr_matrix_decompision_',
     'yelp_rur': 'yelpnet_rur_matrix_decompision_'

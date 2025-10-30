@@ -19,6 +19,9 @@ from . import *
 from .rgtan_lpa import load_lpa_subtensor
 from .rgtan_model import RGTAN
 
+# tensorboard作图
+from datetime import datetime
+from torch.utils.tensorboard import SummaryWriter
 
 def rgtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features, neigh_features: pd.DataFrame, nei_att_head):
     # torch.autograd.set_detect_anomaly(True)
@@ -46,8 +49,26 @@ def rgtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features, 
     y = labels
     labels = torch.from_numpy(y.values).long().to(device)
     loss_fn = nn.CrossEntropyLoss().to(device)
+
+
+    # ========== TensorBoard 初始化 ==========
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_dir = "runs/rgtan_experiment"
+    log_dir_with_time = os.path.join(log_dir, timestamp)
+    # 确保目录存在
+    os.makedirs(log_dir_with_time, exist_ok=True)
+    # 创建 TensorBoard writer
+    writer = SummaryWriter(log_dir=log_dir_with_time)
+    print(f"TensorBoard logs will be saved to: {log_dir_with_time}")
+
+
+
     for fold, (trn_idx, val_idx) in enumerate(kfold.split(feat_df.iloc[train_idx], y_target)):
         print(f'Training fold {fold + 1}')
+        # fold标记
+        fold_tag = f'Fold_{fold + 1}'
+
+
         trn_ind, val_ind = torch.from_numpy(np.array(train_idx)[trn_idx]).long().to(
             device), torch.from_numpy(np.array(train_idx)[val_idx]).long().to(device)
 
@@ -128,6 +149,17 @@ def rgtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features, 
                     ).detach(), dim=1) == batch_labels) / batch_labels.shape[0]
                     score = torch.softmax(train_batch_logits.clone().detach(), dim=1)[
                         :, 1].cpu().numpy()
+
+                    writer.add_scalar(f'{fold_tag}/Train/Loss', np.mean(train_loss_list),
+                                      epoch * len(train_dataloader) + step)
+                    writer.add_scalar(f'{fold_tag}/Train/AP',
+                                      average_precision_score(batch_labels.cpu().numpy(), score),
+                                      epoch * len(train_dataloader) + step)
+                    writer.add_scalar(f'{fold_tag}/Train/Acc', tr_batch_pred.detach(),
+                                      epoch * len(train_dataloader) + step)
+                    writer.add_scalar(f'{fold_tag}/Train/AUC', roc_auc_score(batch_labels.cpu().numpy(), score),
+                                      epoch * len(train_dataloader) + step)
+
                     try:
                         print('In epoch:{:03d}|batch:{:04d}, train_loss:{:4f}, '
                               'train_ap:{:.4f}, train_acc:{:.4f}, train_auc:{:.4f}'.format(epoch, step,
@@ -171,6 +203,9 @@ def rgtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features, 
                     if step % 10 == 0:
                         score = torch.softmax(val_batch_logits.clone().detach(), dim=1)[
                             :, 1].cpu().numpy()
+
+
+
                         try:
                             print('In epoch:{:03d}|batch:{:04d}, val_loss:{:4f}, val_ap:{:.4f}, '
                                   'val_acc:{:.4f}, val_auc:{:.4f}'.format(epoch,
@@ -180,6 +215,13 @@ def rgtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features, 
                                                                               batch_labels.cpu().numpy(), score),
                                                                           val_batch_pred.detach(),
                                                                           roc_auc_score(batch_labels.cpu().numpy(), score)))
+                            writer.add_scalar(f'{fold_tag}/Val/Loss', val_loss_list / val_all_list, epoch)
+                            writer.add_scalar(f'{fold_tag}/Val/AP',
+                                              average_precision_score(batch_labels.cpu().numpy(), score),
+                                              epoch)
+                            writer.add_scalar(f'{fold_tag}/Val/Acc', val_batch_pred.detach(), epoch)
+                            writer.add_scalar(f'{fold_tag}/Val/AUC', roc_auc_score(batch_labels.cpu().numpy(), score),
+                                              epoch)
                         except:
                             pass
 
@@ -237,6 +279,12 @@ def rgtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features, 
     print("test AUC:", roc_auc_score(y_target, test_score))
     print("test f1:", f1_score(y_target, test_score1, average="macro"))
     print("test AP:", average_precision_score(y_target, test_score))
+
+    writer.add_scalar('Test/AUC', roc_auc_score(y_target, test_score))
+    writer.add_scalar('Test/F1', f1_score(y_target, test_score1, average="macro"))
+    writer.add_scalar('Test/AP', average_precision_score(y_target, test_score))
+
+    writer.close()
 
 
 def loda_rgtan_data(dataset: str, test_size: float):

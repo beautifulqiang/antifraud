@@ -30,8 +30,9 @@ def block_matrix_multiply(A, B, block_size, device):
 def matrix_powers_gpu(adj_list, n, block_size, matrix_prefix):
     assert n % block_size == 0, "n must be divisible by block_size"
     
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print(device)
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device('cpu')
+    print("using device:", device)
 
     adj_matrix_np = create_adjacency_matrix(adj_list, n)
     adj_matrix = torch.from_numpy(adj_matrix_np).float().to(device)

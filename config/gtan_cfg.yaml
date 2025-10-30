@@ -10,7 +10,7 @@ n_fold: 5
 seed: 2023
 max_epochs: 15
 gated: True
+#dataset: amazon
+dataset: yelp
 #dataset: S-FFSD
-#dataset: yelp
-dataset: amazon
 test_size: 0.4
