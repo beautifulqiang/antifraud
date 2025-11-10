@@ -14,7 +14,7 @@ class argVar:
         self.SupGCL_train_flag=True
         self.SupGCL_visualize_flag=False ### visualization of SupGCL
         
-        self.GuiDDPM_train_flag=False # train or sample
+        self.GuiDDPM_train_flag=True # train or sample
         self.GuiDDPM_train_steps=6000 
         self.GuiDDPM_train_diffusion_steps=1000
         self.GuiDDPM_train_diffusion_batch_size=20

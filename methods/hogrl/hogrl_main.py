@@ -8,6 +8,12 @@ import numpy as np
 import random as rd
 from sklearn.metrics import f1_score, accuracy_score, recall_score, roc_auc_score, average_precision_score
 
+
+# tensorboard作图
+import os
+from datetime import datetime
+from torch.utils.tensorboard import SummaryWriter
+
 def test(idx_eval, y_eval, gnn_model, feat_data, edge_indexs):
     gnn_model.eval()
     logits, _ = gnn_model(feat_data, edge_indexs)
@@ -23,6 +29,7 @@ def test(idx_eval, y_eval, gnn_model, feat_data, edge_indexs):
 
 def hogrl_main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cpu')
     print(device)
     print('loading data...')
     prefix = os.path.join(os.path.dirname(__file__), "..", "..", "data/")
@@ -58,7 +65,21 @@ def hogrl_main(args):
     
     best_val_auc = 0.0
     best_model_state = None
-    
+
+    # ========== TensorBoard 初始化 ==========
+    # 给 log_dir 加上时间戳子目录
+    log_dir = "runs/hogrl_experiment"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_dir_with_time = os.path.join(log_dir, timestamp)
+
+    # 确保目录存在
+    os.makedirs(log_dir_with_time, exist_ok=True)
+
+    # 创建 TensorBoard writer
+    writer = SummaryWriter(log_dir=log_dir_with_time)
+    print(f"TensorBoard logs will be saved to: {log_dir_with_time}")
+
+
     print('training...')
     for epoch in range(args['num_epochs']):
         gnn_model.train()
@@ -87,16 +108,31 @@ def hogrl_main(args):
         if epoch % 10 == 9: # validate every 10 epochs 
             val_auc, val_ap, val_f1, val_g_mean = test(idx_val, y_val, gnn_model, feat_data, edge_indexs)
             print(f'Epoch: {epoch}, Val AUC: {val_auc:.4f}, Val AP: {val_ap:.4f}, Val F1: {val_f1:.4f}, Val G-mean: {val_g_mean:.4f}')
+
+            writer.add_scalar("Train/AUC", val_auc, epoch)
+            writer.add_scalar("Train/F1", val_f1, epoch)
+            writer.add_scalar("Train/AP", val_ap, epoch)
+            writer.add_scalar("Train/G-mean", val_g_mean, epoch)
             
             if val_auc > best_val_auc:
                 best_val_auc = val_auc
-                best_model_state = gnn_model.state_dict() 
+                best_model_state = gnn_model.state_dict()
+
+        avg_loss = loss / num_batches
+        writer.add_scalar("Train/Loss", avg_loss, epoch)
 
     # test
     gnn_model.load_state_dict(best_model_state)  
     test_auc, test_ap, test_f1, test_g_mean = test(idx_test, y_test, gnn_model, feat_data, edge_indexs)
     print(f'Test AUC: {test_auc:.4f}, Test AP: {test_ap:.4f}, '
         f'Test F1: {test_f1:.4f}, Test G-mean: {test_g_mean:.4f}')
+
+    writer.add_scalar("Test/AUC", test_auc, epoch)
+    writer.add_scalar("Test/F1", test_f1, epoch)
+    writer.add_scalar("Test/AP", test_ap, epoch)
+    writer.add_scalar("Test/G-mean", test_g_mean, epoch)
+
+    writer.close()
 
     out,embedding = gnn_model(feat_data,edge_indexs)
     

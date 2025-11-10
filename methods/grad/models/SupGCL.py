@@ -98,7 +98,7 @@ class SupGCL():
 
         color_print(f'!!!!! Start clustering for batch in SupGCL')
         self.cluster_data=ClusterData(self.data, num_parts=self.num_train_part, recursive=False)
-        self.subgraph_cluster_loader = ClusterLoader(self.cluster_data, batch_size=self.batch_size, shuffle=True, num_workers=12)
+        self.subgraph_cluster_loader = ClusterLoader(self.cluster_data, batch_size=self.batch_size, shuffle=True, num_workers=0)
         color_print(f'!!!!! Finish clustering for batch in SupGCL')
 
         self.aug1 = A.Compose([A.FeatureDropout(pf=0.3), A.FeatureMasking(pf=0.3)])

@@ -118,6 +118,8 @@ def stagn_train_2d(
     writer.add_scalar("Test/F1", f1_test, epoch)
     writer.add_scalar("Test/AP", ap_test, epoch)
 
+    writer.close()
+
 
 def stagn_main(
     features,

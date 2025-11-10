@@ -340,9 +340,9 @@ def sample_create_argparser(args, num_samples, train_flag,diffusion_steps):
     return parser
 
 class GuiDDPM:
-    def __init__(self, global_args, graph_pyg_ssupgcl, node_groups, edge_index_unselected, guidance, train_flag, model_path, syn_relation_filename, device):
+    def __init__(self, global_args, graph_pyg_supgcl, node_groups, edge_index_unselected, guidance, train_flag, model_path, syn_relation_filename, device):
         self.device=device
-        self.graph_pyg_ssupgcl=graph_pyg_ssupgcl
+        self.graph_pyg_supgcl=graph_pyg_supgcl
         self.node_groups=node_groups
         self.train_flag=train_flag
         self.model_path=model_path
@@ -362,7 +362,7 @@ class GuiDDPM:
         data_loader=torch.utils.data.DataLoader(
                 dataset=self.train_dataset,
                 batch_size=self.train_args.batch_size,
-                shuffle=True,num_workers=32,
+                shuffle=True,num_workers=0,
                 drop_last=True)
         while True:
             yield from data_loader

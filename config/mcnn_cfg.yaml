@@ -7,7 +7,7 @@ testlabel: data/tel_2d.npy
 
 test_size: 0.2
 
-epochs: 30
+epochs: 100
 batch_size: 512
 lr: 0.001
 # 尝试使用gpu

@@ -4,6 +4,7 @@ import os
 
 import blobfile as bf
 import numpy as np
+import torch
 import torch as th
 import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
@@ -19,6 +20,8 @@ from .fp16_util import (
 )
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
+
+import torch.distributed as dist
 
 # For ImageNet experiments, this was a good default value.
 # We found that the lg_loss_scale quickly climbed to
@@ -70,7 +73,16 @@ class TrainLoop:
 
         self.step = 0
         self.resume_step = 0
-        self.global_batch = self.batch_size * dist.get_world_size()
+
+        import torch.distributed as dist
+
+        # 安全获取 world_size（当未初始化分布式时返回 1）
+        if dist.is_available() and dist.is_initialized():
+            world_size = dist.get_world_size()
+        else:
+            world_size = 1
+
+        self.global_batch = self.batch_size * world_size
 
         self.model_params = list(self.model.parameters())
         self.master_params = self.model_params
@@ -96,14 +108,19 @@ class TrainLoop:
 
         if th.cuda.is_available():
             self.use_ddp = True
-            self.ddp_model = DDP(
-                self.model,
-                device_ids=[dist_util.dev()],
-                output_device=dist_util.dev(),
-                broadcast_buffers=False,
-                bucket_cap_mb=128,
-                find_unused_parameters=False,
-            )
+
+            import torch.distributed as dist
+            from torch.nn.parallel import DistributedDataParallel as DDP
+
+            if dist.is_available() and dist.is_initialized():
+                self.ddp_model = DDP(
+                    self.model,
+                    device_ids=[self.device] if torch.cuda.is_available() else None,
+                    output_device=self.device if torch.cuda.is_available() else None,
+                )
+            else:
+                # 单机模式直接使用普通模型
+                self.ddp_model = self.model
         else:
             if dist.get_world_size() > 1:
                 logger.warn(

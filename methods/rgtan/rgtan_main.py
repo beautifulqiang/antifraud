@@ -150,16 +150,6 @@ def rgtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features, 
                     score = torch.softmax(train_batch_logits.clone().detach(), dim=1)[
                         :, 1].cpu().numpy()
 
-                    writer.add_scalar(f'{fold_tag}/Train/Loss', np.mean(train_loss_list),
-                                      epoch * len(train_dataloader) + step)
-                    writer.add_scalar(f'{fold_tag}/Train/AP',
-                                      average_precision_score(batch_labels.cpu().numpy(), score),
-                                      epoch * len(train_dataloader) + step)
-                    writer.add_scalar(f'{fold_tag}/Train/Acc', tr_batch_pred.detach(),
-                                      epoch * len(train_dataloader) + step)
-                    writer.add_scalar(f'{fold_tag}/Train/AUC', roc_auc_score(batch_labels.cpu().numpy(), score),
-                                      epoch * len(train_dataloader) + step)
-
                     try:
                         print('In epoch:{:03d}|batch:{:04d}, train_loss:{:4f}, '
                               'train_ap:{:.4f}, train_acc:{:.4f}, train_auc:{:.4f}'.format(epoch, step,
@@ -169,6 +159,15 @@ def rgtan_main(feat_df, graph, train_idx, test_idx, labels, args, cat_features, 
                                                                                                batch_labels.cpu().numpy(), score),
                                                                                            tr_batch_pred.detach(),
                                                                                            roc_auc_score(batch_labels.cpu().numpy(), score)))
+                        writer.add_scalar(f'{fold_tag}/Train/Loss', np.mean(train_loss_list),
+                                          epoch * len(train_dataloader) + step)
+                        writer.add_scalar(f'{fold_tag}/Train/AP',
+                                          average_precision_score(batch_labels.cpu().numpy(), score),
+                                          epoch * len(train_dataloader) + step)
+                        writer.add_scalar(f'{fold_tag}/Train/Acc', tr_batch_pred.detach(),
+                                          epoch * len(train_dataloader) + step)
+                        writer.add_scalar(f'{fold_tag}/Train/AUC', roc_auc_score(batch_labels.cpu().numpy(), score),
+                                          epoch * len(train_dataloader) + step)
                     except:
                         pass
 

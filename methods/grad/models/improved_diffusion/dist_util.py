@@ -20,25 +20,30 @@ SETUP_RETRY_COUNT = 3
 
 def setup_dist():
     """
-    Setup a distributed process group.
+    Safe setup for single-machine or distributed training.
+    If running on a single GPU/CPU, this will skip distributed setup.
     """
+    import torch.distributed as dist
+
+    # 若分布式已初始化，则直接返回
     if dist.is_initialized():
+        print("[Info] Distributed process group already initialized.")
         return
 
-    comm = MPI.COMM_WORLD
-    backend = "gloo" if not th.cuda.is_available() else "nccl"
+    # 如果不是多进程环境，直接跳过分布式
+    if "RANK" not in os.environ or "WORLD_SIZE" not in os.environ:
+        print("[Info] No MPI or distributed environment detected, using single-process mode.")
+        return
 
-    if backend == "gloo":
-        hostname = "localhost"
-    else:
-        hostname = socket.gethostbyname(socket.getfqdn())
-    os.environ["MASTER_ADDR"] = comm.bcast(hostname, root=0)
-    os.environ["RANK"] = str(comm.rank)
-    os.environ["WORLD_SIZE"] = str(comm.size)
-
-    port = comm.bcast(_find_free_port(), root=0)
-    os.environ["MASTER_PORT"] = str(port)
-    dist.init_process_group(backend=backend, init_method="env://")
+    try:
+        backend = "gloo"  # CPU/GPU均可
+        os.environ.setdefault("MASTER_ADDR", "localhost")
+        os.environ.setdefault("MASTER_PORT", "12355")
+        dist.init_process_group(backend=backend, init_method="env://")
+        print(f"[Info] Distributed initialized (rank={dist.get_rank()}, world_size={dist.get_world_size()}).")
+    except Exception as e:
+        print(f"[Warning] Failed to initialize distributed environment: {e}")
+        print("[Info] Falling back to single-process mode.")
 
 
 def dev():
@@ -67,6 +72,11 @@ def sync_params(params):
     """
     Synchronize a sequence of Tensors across ranks from rank 0.
     """
+    # 单机运行的特判
+    import torch.distributed as dist
+    if not dist.is_initialized():
+        # 单机时直接跳过
+        return
     for p in params:
         with th.no_grad():
             dist.broadcast(p, 0)

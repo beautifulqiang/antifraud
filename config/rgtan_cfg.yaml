@@ -8,11 +8,12 @@ device: "cuda:0"
 early_stopping: 10
 n_fold: 5
 seed: 2023
-max_epochs: 15
+max_epochs: 30
 gated: True
-#dataset: S-FFSD
-dataset: yelp
-test_size: 0.6
+dataset: S-FFSD
+#dataset: yelp
+#dataset: amazon
+test_size: 0.4
 nei_att_heads:
     yelp: 4
     amazon: 5
